@@ -15,7 +15,7 @@ A comprehensive ARM64 ELF packer and loader system for AArch64 Linux binaries. T
 ### 1. Clone the Repository
 ```bash
 git clone <repository-url>
-cd arm64-elf-packer
+cd hARMless
 ```
 
 ### 3. Build All Components
