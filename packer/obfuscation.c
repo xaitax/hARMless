@@ -1,4 +1,5 @@
 #include "common.h"
+#include <elf.h>
 
 
 static const uint32_t arm64_nop_variants[] = {
@@ -12,57 +13,46 @@ static const uint32_t arm64_nop_variants[] = {
     0x8A1F0000,  // and x0, x0, xzr
 };
 
-
-typedef struct {
-    uint32_t original;
-    uint32_t substitute;
-    uint32_t mask;  
-} arm64_substitution_t;
-
-static const arm64_substitution_t arm64_substitutions[] = {
-    // mov x0, x1 -> orr x0, x1, xzr (functionally equivalent)
-    {0xAA0103E0, 0xAA1F0020, 0xFFE0FFE0},
-
-    // add x0, x0, #0 -> sub x0, x0, #0 (both do nothing)
-    {0x91000000, 0xD1000000, 0xFF000000},
-
-    // mov x0, #imm -> movz x0, #imm (different encoding)
-    {0xD2800000, 0x52800000, 0xFF800000},
-};
-
 // Generate polymorphic NOPs for ARM64
-void generate_polymorphic_nops_arm64(uint8_t* buffer, size_t count) {
-    if (!buffer || count < 4) return;
-
+void generate_polymorphic_nops_arm64(uint8_t* buffer, size_t nop_bytes, size_t max_size) {
+    if (!buffer || nop_bytes > max_size || (nop_bytes % 4) != 0) return;
+    
     uint32_t* inst_buffer = (uint32_t*)buffer;
-    size_t nop_count = count / 4;
-
+    size_t nop_count = nop_bytes / 4;
+    
+    // Validate alignment
+    if ((uintptr_t)inst_buffer % 4 != 0) return;
+    
     for (size_t i = 0; i < nop_count; i++) {
-
-        int variant = rand() % (sizeof(arm64_nop_variants) / sizeof(arm64_nop_variants[0]));
-        inst_buffer[i] = arm64_nop_variants[variant];
-
-        if (variant >= 1 && variant <= 4) {
-            uint32_t reg_bits = (rand() % 31) << 5;  
-            inst_buffer[i] |= reg_bits;
-        }
+        inst_buffer[i] = arm64_nop_variants[i % strlen(arm64_nop_variants)];
     }
+
 }
 
-void substitute_instructions_arm64(uint8_t* code, size_t len) {
-    if (!code || len < 4) return;
-
+void substitute_instructions_arm64(uint8_t* code, size_t max_len) {
+if (!code || max_len < 4 || (max_len % 4) != 0) return;
+    
     uint32_t* instructions = (uint32_t*)code;
-    size_t inst_count = len / 4;
-
+    size_t inst_count = max_len / 4;
+    
+    // Validate alignment
+    if ((uintptr_t)instructions % 4 != 0) return;
+    
     for (size_t i = 0; i < inst_count; i++) {
-        for (size_t j = 0; j < sizeof(arm64_substitutions) / sizeof(arm64_substitutions[0]); j++) {
-            const arm64_substitution_t* sub = &arm64_substitutions[j];
-
-            if ((instructions[i] & sub->mask) == sub->original) {
-                if (rand() % 100 < 30) {
-                    instructions[i] = sub->substitute | (instructions[i] & ~sub->mask);
-                }
+        // Only substitute safe, equivalent instructions
+        uint32_t inst = instructions[i];
+        
+        // mov x0, x1 -> orr x0, x1, xzr
+        if ((inst & 0xFFE0FFE0) == 0xAA0003E0) {
+            if (rand() % 100 < 30) {
+                instructions[i] = (inst & ~0xFFE0FFE0) | 0xAA000020;
+            }
+        }
+        
+        // add x0, x0, #0 -> sub x0, x0, #0  
+        else if ((inst & 0xFF000000) == 0x91000000) {
+            if (rand() % 100 < 20) {
+                instructions[i] = (inst & ~0xFF000000) | 0xD1000000;
             }
         }
     }
@@ -90,9 +80,9 @@ void obfuscate_control_flow_arm64(uint8_t* code, size_t len) {
                         }
                     }
 
-                    // Insert dummy condition that's always false
-                    instructions[i] = 0xF1000000;      // subs x0, x0, #0 (sets flags)
-                    instructions[i + 1] = 0x54000020;  // b.eq +4 (never taken)
+                    
+                    instructions[i] = 0xF1000000;      
+                    instructions[i + 1] = 0x54000020;  
 
                     i += 2;  // Skip the inserted instructions
                     insertions_made++;
@@ -104,25 +94,45 @@ void obfuscate_control_flow_arm64(uint8_t* code, size_t len) {
 
 
 void apply_arm64_obfuscation(uint8_t* code, size_t len) {
-    if (!code || len < 4) return;
-
-    srand(time(NULL) ^ (uintptr_t)code);
-
-    if (len >= 64) {  // Ensure we have space
-        generate_polymorphic_nops_arm64(code, 32);  // 8 instructions of NOPs
+        if (!code || len < 128) return;
+    
+    // Parse ELF to find executable sections
+    const Elf64_Ehdr* ehdr = (const Elf64_Ehdr*)code;
+    if (!is_elf64_arm64(code)) return;
+    
+    // Find .text section
+    const Elf64_Phdr* phdr = (const Elf64_Phdr*)(code + ehdr->e_phoff);
+    size_t text_start = 0, text_size = 0;
+    
+    for (int i = 0; i < ehdr->e_phnum; i++) {
+        if (phdr[i].p_type == PT_LOAD && (phdr[i].p_flags & PF_X)) {
+            text_start = phdr[i].p_offset;
+            text_size = phdr[i].p_filesz;
+            break;
+        }
     }
     
-
-    // Apply instruction substitution
+    if (text_start == 0 || text_size < 64) return;
     
-    substitute_instructions_arm64(code, len);
+    // Ensure 4-byte alignment
+    text_start = (text_start + 3) & ~3;
     
-
-    // Apply control flow obfuscation (most complex, apply last)
+    // Make memory writable
+    size_t page_size = getpagesize();
+    void* page_start = (void*)((uintptr_t)(code + text_start) & ~(page_size - 1));
+    size_t page_len = ((text_size + page_size - 1) / page_size) * page_size;
     
-    obfuscate_control_flow_arm64(code, len);
+    if (mprotect(page_start, page_len, PROT_READ | PROT_WRITE | PROT_EXEC) != 0) {
+        return; // Cannot modify memory
+    }
     
-
+    size_t safe_size = text_size - 64; // Leave space at end
+    if (safe_size >= 32) {
+        generate_polymorphic_nops_arm64(code + text_start + 32, 32, safe_size - 32);
+        substitute_instructions_arm64(code + text_start + 32, safe_size - 32);
+    }
+    
+    mprotect(page_start, page_len, PROT_READ | PROT_EXEC);
 }
 
 // Enhanced anti-forensics functions

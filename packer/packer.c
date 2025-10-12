@@ -86,12 +86,12 @@ void multi_layer_encrypt(uint8_t* data, size_t len, const pack_header_t* header)
 
     // Layer 2: ChaCha20
     
-    //chacha20_encrypt(data, len, header->secondary_key, header->nonce);
+    chacha20_encrypt(data, len, header->secondary_key, header->nonce);
     
 
     // Layer 3: RC4
     
-    //rc4_encrypt_decrypt(header->tertiary_key, 32, data, data, len);
+    rc4_encrypt_decrypt(header->tertiary_key, 32, data, data, len);
     
 }
 

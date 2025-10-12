@@ -62,11 +62,9 @@ pack: $(PACKER_BIN) $(LOADER_BIN) $(STUBGEN_BIN)
 		echo "Usage: make pack INPUT=<binary> OUTPUT=<output>"; \
 		exit 1; \
 	fi
-	@echo "Creating maximum stealth packed binary..."
 	$(PACKER_BIN) $(INPUT) $(OUTPUT).packed
 	$(STUBGEN_BIN) $(LOADER_BIN) $(OUTPUT).packed $(OUTPUT)
 	@echo "Output packed binary created: $(OUTPUT)"
-
 
 # Clean build artifacts
 clean:
