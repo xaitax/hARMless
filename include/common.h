@@ -136,7 +136,6 @@ pack_header_t* find_packed_header(const uint8_t* data, size_t data_size);
 // ARM64 obfuscation function prototypes
 void generate_polymorphic_nops_arm64(uint8_t* buffer, size_t nop_bytes, size_t max_size);
 void substitute_instructions_arm64(uint8_t* code, size_t len);
-void obfuscate_control_flow_arm64(uint8_t* code, size_t len);
 void apply_arm64_obfuscation(uint8_t* code, size_t len);
 
 // Enhanced anti-forensics functions

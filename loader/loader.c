@@ -140,7 +140,6 @@ int detect_virtualization(void) {
 
     char line[256];
     while (fgets(line, sizeof(line), cpuinfo)) {
-        // Convert to lowercase for comparison
         for (char* p = line; *p; p++) {
             if (*p >= 'A' && *p <= 'Z') *p += 32;
         }

@@ -166,10 +166,9 @@ int main(int argc, char* argv[]) {
     printf("Packing ARM64 ELF binary: %s\n", input_file);
     printf("Original size: %zu bytes\n", file_size);
 
-    if (1) {
-        printf("Applying ARM64 obfuscation...\n");
-        apply_arm64_obfuscation(file_data, file_size);
-    }
+    
+    apply_arm64_obfuscation(file_data, file_size);
+    
 
     uint32_t original_crc = crc32(file_data, file_size);
     uint8_t* encrypted_data = malloc(file_size);
@@ -195,7 +194,6 @@ int main(int argc, char* argv[]) {
     generate_random_key(header.nonce, 16);
     generate_random_key(header.salt, 16);
 
-    printf("Applying multi-layer encryption...\n");
     multi_layer_encrypt(encrypted_data, file_size, &header);
 
     // Write packed file

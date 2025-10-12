@@ -43,7 +43,6 @@ int execute_from_memory(const uint8_t* elf_data, size_t elf_size, char* const ar
         return -1;
     }
 
-    // Create path to memory file
     char memfd_path[256];
     snprintf(memfd_path, sizeof(memfd_path), "/proc/self/fd/%d", memfd);
 

