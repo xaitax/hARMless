@@ -1,35 +1,34 @@
 #ifndef COMMON_H
 #define COMMON_H
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/ptrace.h>
+#include <sys/wait.h>
+#include <sys/mman.h>
+#include <sys/resource.h>
+#include <sys/prctl.h>
+#include <fcntl.h>
+#include <string.h>
+#include <stdio.h>
+#include <time.h>
 #include <errno.h>
 
-// Magic number for packed binaries
-#define PACKED_MAGIC 0x50414B45  // "PAKE"
+#define PACKED_MAGIC 0x41524D36 // "ARM6"
 
-// Maximum key size for RC4
-#define MAX_KEY_SIZE 256
-
-// Pack header structure
 typedef struct {
-    uint32_t magic;
+    uint32_t magic;              
     uint32_t original_size;
     uint32_t packed_size;
     uint32_t crc32;
-    uint32_t key_size;
-    uint8_t key[MAX_KEY_SIZE];
-} __attribute__((packed)) pack_header_t;
-
-// Function prototypes
-uint32_t crc32(const uint8_t* data, size_t len);
-void generate_random_key(uint8_t* key, size_t key_size);
+    uint8_t primary_key[32];     // AES-256 key
+    uint8_t secondary_key[32];   // ChaCha20 key
+    uint8_t tertiary_key[32];    // RC4 key
+    uint8_t nonce[16];           
+    uint8_t salt[16];            
+} pack_header_t;
 
 // ARM64 syscall numbers
 #define __NR_read 63
@@ -42,8 +41,13 @@ void generate_random_key(uint8_t* key, size_t key_size);
 #define __NR_memfd_create 279
 #define __NR_ftruncate 46
 #define __NR_lseek 62
+#define __NR_mprotect 226
+#define __NR_ptrace 101
+#define __NR_getpid 172
+#define __NR_getppid 173
+#define __NR_prctl 167
 
-// ARM64 syscall wrapper
+
 static inline long syscall1(long number, long arg1) {
     long ret;
     __asm__ volatile (
@@ -107,5 +111,41 @@ static inline long syscall6(long number, long arg1, long arg2, long arg3, long a
     );
     return ret;
 }
+
+static inline long syscall_obf(long number, long arg1) {
+    long obf_number = number ^ 0xDEADBEEF;
+    obf_number = obf_number ^ 0xDEADBEEF; 
+    return syscall1(obf_number, arg1);
+}
+
+static inline long syscall3_obf(long number, long arg1, long arg2, long arg3) {
+    long obf_number = number ^ 0xDEADBEEF;
+    obf_number = obf_number ^ 0xDEADBEEF;
+    return syscall3(obf_number, arg1, arg2, arg3);
+}
+
+// Function prototypes
+uint32_t crc32(const uint8_t* data, size_t len);
+void generate_random_key(uint8_t* key, size_t key_size);
+int comprehensive_anti_debug_check();
+void multi_layer_encrypt(uint8_t* data, size_t len, const pack_header_t* header);
+void multi_layer_decrypt(uint8_t* data, size_t len, const pack_header_t* header);
+int execute_from_memory(const uint8_t* elf_data, size_t elf_size, char* const argv[], char* const envp[]);
+pack_header_t* find_packed_header(const uint8_t* data, size_t data_size);
+
+// ARM64 obfuscation function prototypes
+void generate_polymorphic_nops_arm64(uint8_t* buffer, size_t count);
+void substitute_instructions_arm64(uint8_t* code, size_t len);
+void obfuscate_control_flow_arm64(uint8_t* code, size_t len);
+void apply_arm64_obfuscation(uint8_t* code, size_t len);
+
+// Enhanced anti-forensics functions
+void secure_memory_wipe(void* ptr, size_t size);
+void prevent_core_dumps(void);
+void hide_process_title(int argc, char* argv[]);
+
+// Process masquerading functions
+int create_masqueraded_memfd(void);
+const char* get_random_innocent_name(void);
 
 #endif // COMMON_H
