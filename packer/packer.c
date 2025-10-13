@@ -1,14 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <sys/stat.h>
 #include <time.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
 #include "common.h"
 #include "elf64.h"
 #include "rc4.h"
-#include "crc32.h"
 
 static const uint32_t crc32_table[256] = {
     0x00000000, 0x77073096, 0xEE0E612C, 0x990951BA, 0x076DC419, 0x706AF48F,
@@ -59,23 +58,19 @@ static const uint32_t crc32_table[256] = {
 uint32_t crc32(const uint8_t* data, size_t len) {
     uint32_t crc = 0xFFFFFFFF;
     size_t i;
-
     for (i = 0; i < len; i++) {
         crc = crc32_table[(crc ^ data[i]) & 0xFF] ^ (crc >> 8);
     }
-
     return crc ^ 0xFFFFFFFF;
 }
 
 void generate_random_key(uint8_t* key, size_t key_size) {
     size_t i;
     FILE* urandom = fopen("/dev/urandom", "rb");
-
     if (urandom) {
         fread(key, 1, key_size, urandom);
         fclose(urandom);
     } else {
-        // Fallback to poor quality random
         srand(time(NULL));
         for (i = 0; i < key_size; i++) {
             key[i] = rand() & 0xFF;
@@ -83,9 +78,25 @@ void generate_random_key(uint8_t* key, size_t key_size) {
     }
 }
 
+void multi_layer_encrypt(uint8_t* data, size_t len, const pack_header_t* header) {
+    // Layer 1: AES-256
+    
+    aes256_encrypt(data, len, header->primary_key);
+    
+
+    // Layer 2: ChaCha20
+    
+    chacha20_encrypt(data, len, header->secondary_key, header->nonce);
+    
+
+    // Layer 3: RC4
+    
+    rc4_encrypt_decrypt(header->tertiary_key, 32, data, data, len);
+    
+}
+
 int is_elf64(const void* data) {
     const Elf64_Ehdr* ehdr = (const Elf64_Ehdr*)data;
-
     return (ehdr->e_ident[0] == ELFMAG0 &&
             ehdr->e_ident[1] == ELFMAG1 &&
             ehdr->e_ident[2] == ELFMAG2 &&
@@ -95,35 +106,31 @@ int is_elf64(const void* data) {
 
 int is_elf64_arm64(const void* data) {
     const Elf64_Ehdr* ehdr = (const Elf64_Ehdr*)data;
-
     return is_elf64(data) && ehdr->e_machine == EM_AARCH64;
 }
 
 void print_usage(const char* program_name) {
+    printf("Advanced ARM64 ELF Packer v2 - Integrated Obfuscation\n");
     printf("Usage: %s <input_elf> <output_packed>\n", program_name);
-    printf("\nPacks an ARM64 ELF binary with RC4 encryption\n");
-    printf("\nOptions:\n");
-    printf("  input_elf      - ARM64 ELF binary to pack\n");
-    printf("  output_packed  - Output packed file\n");
 }
 
 int main(int argc, char* argv[]) {
-    if (argc != 3) {
-        print_usage(argv[0]);
-        return 1;
-    }
+
 
     const char* input_file = argv[1];
     const char* output_file = argv[2];
 
-    // Open input file
+
+    printf("Advanced ARM64 ELF Packer\n");
+
+
+    // Open and read input file
     FILE* input_fp = fopen(input_file, "rb");
     if (!input_fp) {
         fprintf(stderr, "Error: Cannot open input file '%s'\n", input_file);
         return 1;
     }
 
-    // Get file size
     fseek(input_fp, 0, SEEK_END);
     size_t file_size = ftell(input_fp);
     fseek(input_fp, 0, SEEK_SET);
@@ -134,7 +141,6 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // Read input file
     uint8_t* file_data = malloc(file_size);
     if (!file_data) {
         fprintf(stderr, "Error: Cannot allocate memory for file data\n");
@@ -150,7 +156,7 @@ int main(int argc, char* argv[]) {
     }
     fclose(input_fp);
 
-    // Verify it's an ARM64 ELF file
+    // Verify ARM64 ELF
     if (!is_elf64_arm64(file_data)) {
         fprintf(stderr, "Error: Input file is not an ARM64 ELF binary\n");
         free(file_data);
@@ -160,11 +166,11 @@ int main(int argc, char* argv[]) {
     printf("Packing ARM64 ELF binary: %s\n", input_file);
     printf("Original size: %zu bytes\n", file_size);
 
-    uint8_t key[32];  // 256-bit key
-    generate_random_key(key, sizeof(key));
+    
+    apply_arm64_obfuscation(file_data, file_size);
+    
 
     uint32_t original_crc = crc32(file_data, file_size);
-
     uint8_t* encrypted_data = malloc(file_size);
     if (!encrypted_data) {
         fprintf(stderr, "Error: Cannot allocate memory for encrypted data\n");
@@ -172,15 +178,23 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    rc4_encrypt_decrypt(key, sizeof(key), file_data, encrypted_data, file_size);
+    memcpy(encrypted_data, file_data, file_size);
 
     pack_header_t header;
+    memset(&header, 0, sizeof(header));
+
     header.magic = PACKED_MAGIC;
     header.original_size = file_size;
-    header.packed_size = file_size;  
+    header.packed_size = file_size;
     header.crc32 = original_crc;
-    header.key_size = sizeof(key);
-    memcpy(header.key, key, sizeof(key));
+
+    generate_random_key(header.primary_key, 32);
+    generate_random_key(header.secondary_key, 32);
+    generate_random_key(header.tertiary_key, 32);
+    generate_random_key(header.nonce, 16);
+    generate_random_key(header.salt, 16);
+
+    multi_layer_encrypt(encrypted_data, file_size, &header);
 
     FILE* output_fp = fopen(output_file, "wb");
     if (!output_fp) {
@@ -190,31 +204,22 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    if (fwrite(&header, sizeof(header), 1, output_fp) != 1) {
-        fprintf(stderr, "Error: Cannot write header to output file\n");
-        fclose(output_fp);
-        free(file_data);
-        free(encrypted_data);
-        return 1;
-    }
-
-    if (fwrite(encrypted_data, 1, file_size, output_fp) != file_size) {
-        fprintf(stderr, "Error: Cannot write encrypted data to output file\n");
-        fclose(output_fp);
-        free(file_data);
-        free(encrypted_data);
-        return 1;
-    }
-
+    fwrite(&header, sizeof(header), 1, output_fp);
+    fwrite(encrypted_data, 1, file_size, output_fp);
     fclose(output_fp);
-    free(file_data);
-    free(encrypted_data);
 
-    printf("Packing completed successfully!\n");
+    chmod(output_file, 0755);
+
+    printf("\nPacking completed successfully!\n");
+    printf("==========================================\n");
     printf("Output file: %s\n", output_file);
     printf("Packed size: %zu bytes\n", sizeof(header) + file_size);
-    printf("Key size: %d bytes\n", header.key_size);
     printf("CRC32: 0x%08X\n", original_crc);
+
+    secure_memory_wipe(file_data, file_size);
+    secure_memory_wipe(encrypted_data, file_size);
+    free(file_data);
+    free(encrypted_data);
 
     return 0;
 }
