@@ -69,7 +69,7 @@ void aes256_decrypt(uint8_t* data, size_t len, const uint8_t* key) {
 }
 
 // ChaCha20
-static void chacha20_quarter_round(uint32_t* a, uint32_t* b, uint32_t* c, uint32_t* d) {
+void chacha20_quarter_round(uint32_t* a, uint32_t* b, uint32_t* c, uint32_t* d) {
     *a += *b; *d ^= *a; *d = (*d << 16) | (*d >> 16);
     *c += *d; *b ^= *c; *b = (*b << 12) | (*b >> 20);
     *a += *b; *d ^= *a; *d = (*d << 8) | (*d >> 24);

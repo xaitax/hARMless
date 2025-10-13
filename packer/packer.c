@@ -196,7 +196,6 @@ int main(int argc, char* argv[]) {
 
     multi_layer_encrypt(encrypted_data, file_size, &header);
 
-    // Write packed file
     FILE* output_fp = fopen(output_file, "wb");
     if (!output_fp) {
         fprintf(stderr, "Error: Cannot create output file '%s'\n", output_file);
@@ -209,7 +208,6 @@ int main(int argc, char* argv[]) {
     fwrite(encrypted_data, 1, file_size, output_fp);
     fclose(output_fp);
 
-    // Make output file executable
     chmod(output_file, 0755);
 
     printf("\nPacking completed successfully!\n");
