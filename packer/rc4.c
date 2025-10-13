@@ -120,29 +120,3 @@ void chacha20_encrypt(uint8_t* data, size_t len, const uint8_t* key, const uint8
 void chacha20_decrypt(uint8_t* data, size_t len, const uint8_t* key, const uint8_t* nonce) {
     chacha20_encrypt(data, len, key, nonce);
 }
-
-void derive_key_from_system(uint8_t* derived_key, size_t key_size, const uint8_t* base_key, const uint8_t* salt) {
-    for (size_t i = 0; i < key_size; i++) {
-        derived_key[i] = base_key[i % 32] ^ salt[i % 16] ^ (uint8_t)(i & 0xFF);
-
-        if (i > 0) {
-            derived_key[i] ^= derived_key[i - 1];
-        }
-        if (i > 1) {
-            derived_key[i] = ((derived_key[i] << 2) | (derived_key[i] >> 6)) & 0xFF;
-        }
-    }
-}
-
-void secure_random_bytes(uint8_t* buffer, size_t size) {
-    FILE* urandom = fopen("/dev/urandom", "rb");
-    if (urandom) {
-        fread(buffer, 1, size, urandom);
-        fclose(urandom);
-    } else {
-        srand(time(NULL));
-        for (size_t i = 0; i < size; i++) {
-            buffer[i] = rand() & 0xFF;
-        }
-    }
-}

