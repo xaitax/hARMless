@@ -7,7 +7,7 @@
 #include <sys/stat.h>
 #include "common.h"
 #include "elf64.h"
-#include "rc4.h"
+#include "crypto.h"
 
 static const uint32_t crc32_table[256] = {
     0x00000000, 0x77073096, 0xEE0E612C, 0x990951BA, 0x076DC419, 0x706AF48F,
