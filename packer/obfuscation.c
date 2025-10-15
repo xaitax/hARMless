@@ -110,15 +110,25 @@ void secure_memory_wipe(void* ptr, size_t size) {
 
     volatile uint8_t* mem = (volatile uint8_t*)ptr;
 
+    // Use secure random if available, fallback to rand
+    static int rand_initialized = 0;
+    if (!rand_initialized) {
+        srand(time(NULL) ^ getpid());
+        rand_initialized = 1;
+    }
+
     for (int pass = 0; pass < 3; pass++) {
         for (size_t i = 0; i < size; i++) {
             switch (pass) {
                 case 0: mem[i] = 0x00; break;      // Zeros
-                case 1: mem[i] = 0xFF; break;      // Ones  
+                case 1: mem[i] = 0xFF; break;      // Ones
                 case 2: mem[i] = (uint8_t)rand(); break;  // Random
             }
         }
     }
+
+    // Prevent optimization
+    __asm__ __volatile__("" : : "r"(mem) : "memory");
 }
 
 void prevent_core_dumps(void) {

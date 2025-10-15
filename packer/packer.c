@@ -144,8 +144,8 @@ int main(int argc, char* argv[]) {
     size_t file_size = ftell(input_fp);
     fseek(input_fp, 0, SEEK_SET);
 
-    if (file_size == 0) {
-        fprintf(stderr, "Error: Input file is empty\n");
+    if (file_size == 0 || file_size > SIZE_MAX / 2) {
+        fprintf(stderr, "Error: Input file is empty or too large\n");
         fclose(input_fp);
         return 1;
     }

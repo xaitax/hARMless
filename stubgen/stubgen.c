@@ -45,8 +45,8 @@ int main(int argc, char* argv[]) {
     loader_size = ftell(loader_fp);
     fseek(loader_fp, 0, SEEK_SET);
 
-    if (loader_size == 0) {
-        fprintf(stderr, "Error: Loader file is empty\n");
+    if (loader_size == 0 || loader_size > SIZE_MAX / 2) {
+        fprintf(stderr, "Error: Loader file is empty or too large\n");
         goto cleanup;
     }
 
@@ -60,8 +60,8 @@ int main(int argc, char* argv[]) {
     packed_size = ftell(packed_fp);
     fseek(packed_fp, 0, SEEK_SET);
 
-    if (packed_size == 0) {
-        fprintf(stderr, "Error: Packed file is empty\n");
+    if (packed_size == 0 || packed_size > SIZE_MAX / 2) {
+        fprintf(stderr, "Error: Packed file is empty or too large\n");
         goto cleanup;
     }
 

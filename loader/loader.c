@@ -244,6 +244,11 @@ int main(int argc, char* argv[], char* envp[]) {
     self_size = ftell(self_fp);
     fseek(self_fp, 0, SEEK_SET);
 
+    if (self_size == 0 || self_size > SIZE_MAX / 2) {
+        fclose(self_fp);
+        return 1;
+    }
+
     self_data = malloc(self_size);
     if (!self_data) {
         fclose(self_fp);
