@@ -114,13 +114,11 @@ static inline long syscall6(long number, long arg1, long arg2, long arg3, long a
 
 static inline long syscall_obf(long number, long arg1) {
     long obf_number = number ^ 0xDEADBEEF;
-    obf_number = obf_number ^ 0xDEADBEEF; 
     return syscall1(obf_number, arg1);
 }
 
 static inline long syscall3_obf(long number, long arg1, long arg2, long arg3) {
     long obf_number = number ^ 0xDEADBEEF;
-    obf_number = obf_number ^ 0xDEADBEEF;
     return syscall3(obf_number, arg1, arg2, arg3);
 }
 

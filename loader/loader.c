@@ -175,7 +175,7 @@ int check_debug_environment(void) {
 }
 
 int comprehensive_anti_debug_check() {
-    
+
     // This logic can be expanded
     if (detect_ptrace_arm64()) {
         return 1;
@@ -193,6 +193,7 @@ int comprehensive_anti_debug_check() {
         return 1;
     }
 
+    return 0;
 }
 
 
@@ -207,6 +208,9 @@ void multi_layer_decrypt(uint8_t* data, size_t len, const pack_header_t* header)
 }
 
 pack_header_t* find_packed_header(const uint8_t* data, size_t data_size) {
+    if (data_size < sizeof(pack_header_t)) {
+        return NULL;
+    }
     for (size_t i = data_size - sizeof(pack_header_t); i > 0; i--) {
         pack_header_t* header = (pack_header_t*)(data + i);
         if (header->magic == PACKED_MAGIC) {
