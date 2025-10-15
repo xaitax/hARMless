@@ -1,5 +1,11 @@
 #include "common.h"
-#include <elf.h>
+#include "elf64.h"
+#include <unistd.h>
+
+// Define getpagesize if not available
+#ifndef getpagesize
+#define getpagesize() 4096  // Default page size for most systems
+#endif
 
 
 static const uint32_t arm64_nop_variants[] = {

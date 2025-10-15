@@ -102,7 +102,10 @@ int check_parent_process(void) {
     if (!stat_file) return 0;
 
     pid_t ppid;
-    fscanf(stat_file, "%*d %*s %*c %d", &ppid);
+    if (fscanf(stat_file, "%*d %*s %*c %d", &ppid) != 1) {
+        fclose(stat_file);
+        return 0;
+    }
     fclose(stat_file);
 
     char comm_path[64];

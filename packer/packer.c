@@ -68,7 +68,13 @@ void generate_random_key(uint8_t* key, size_t key_size) {
     size_t i;
     FILE* urandom = fopen("/dev/urandom", "rb");
     if (urandom) {
-        fread(key, 1, key_size, urandom);
+        if (fread(key, 1, key_size, urandom) != key_size) {
+            // Fallback if read fails
+            srand(time(NULL));
+            for (i = 0; i < key_size; i++) {
+                key[i] = rand() & 0xFF;
+            }
+        }
         fclose(urandom);
     } else {
         srand(time(NULL));
@@ -115,7 +121,10 @@ void print_usage(const char* program_name) {
 }
 
 int main(int argc, char* argv[]) {
-
+    if (argc != 3) {
+        print_usage(argv[0]);
+        return 1;
+    }
 
     const char* input_file = argv[1];
     const char* output_file = argv[2];
