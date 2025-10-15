@@ -255,7 +255,8 @@ int main(int argc, char* argv[], char* envp[]) {
         return 1;
     }
 
-    if (fread(self_data, 1, self_size, self_fp) != self_size) {
+    size_t bytes_read = fread(self_data, 1, self_size, self_fp);
+    if (bytes_read != self_size) {
         secure_memory_wipe(self_data, self_size);
         free(self_data);
         fclose(self_fp);

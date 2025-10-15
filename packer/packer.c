@@ -157,8 +157,9 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    if (fread(file_data, 1, file_size, input_fp) != file_size) {
-        fprintf(stderr, "Error: Cannot read input file\n");
+    size_t bytes_read = fread(file_data, 1, file_size, input_fp);
+    if (bytes_read != file_size) {
+        fprintf(stderr, "Error: Cannot read input file (read %zu of %zu bytes)\n", bytes_read, file_size);
         free(file_data);
         fclose(input_fp);
         return 1;
@@ -213,8 +214,23 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    fwrite(&header, sizeof(header), 1, output_fp);
-    fwrite(encrypted_data, 1, file_size, output_fp);
+    size_t header_written = fwrite(&header, sizeof(header), 1, output_fp);
+    if (header_written != 1) {
+        fprintf(stderr, "Error: Cannot write header to output file\n");
+        fclose(output_fp);
+        free(file_data);
+        free(encrypted_data);
+        return 1;
+    }
+
+    size_t data_written = fwrite(encrypted_data, 1, file_size, output_fp);
+    if (data_written != file_size) {
+        fprintf(stderr, "Error: Cannot write encrypted data to output file (wrote %zu of %zu bytes)\n", data_written, file_size);
+        fclose(output_fp);
+        free(file_data);
+        free(encrypted_data);
+        return 1;
+    }
     fclose(output_fp);
 
     chmod(output_file, 0755);
