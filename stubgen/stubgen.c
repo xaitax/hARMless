@@ -45,8 +45,8 @@ int main(int argc, char* argv[]) {
     loader_size = ftell(loader_fp);
     fseek(loader_fp, 0, SEEK_SET);
 
-    if (loader_size == 0) {
-        fprintf(stderr, "Error: Loader file is empty\n");
+    if (loader_size == 0 || loader_size > SIZE_MAX / 2) {
+        fprintf(stderr, "Error: Loader file is empty or too large\n");
         goto cleanup;
     }
 
@@ -60,8 +60,8 @@ int main(int argc, char* argv[]) {
     packed_size = ftell(packed_fp);
     fseek(packed_fp, 0, SEEK_SET);
 
-    if (packed_size == 0) {
-        fprintf(stderr, "Error: Packed file is empty\n");
+    if (packed_size == 0 || packed_size > SIZE_MAX / 2) {
+        fprintf(stderr, "Error: Packed file is empty or too large\n");
         goto cleanup;
     }
 
@@ -71,8 +71,9 @@ int main(int argc, char* argv[]) {
         goto cleanup;
     }
 
-    if (fread(loader_data, 1, loader_size, loader_fp) != loader_size) {
-        fprintf(stderr, "Error: Cannot read loader file\n");
+    size_t loader_bytes_read = fread(loader_data, 1, loader_size, loader_fp);
+    if (loader_bytes_read != loader_size) {
+        fprintf(stderr, "Error: Cannot read loader file (read %zu of %zu bytes)\n", loader_bytes_read, loader_size);
         goto cleanup;
     }
 
@@ -82,8 +83,9 @@ int main(int argc, char* argv[]) {
         goto cleanup;
     }
 
-    if (fread(packed_data, 1, packed_size, packed_fp) != packed_size) {
-        fprintf(stderr, "Error: Cannot read packed file\n");
+    size_t packed_bytes_read = fread(packed_data, 1, packed_size, packed_fp);
+    if (packed_bytes_read != packed_size) {
+        fprintf(stderr, "Error: Cannot read packed file (read %zu of %zu bytes)\n", packed_bytes_read, packed_size);
         goto cleanup;
     }
 
@@ -93,13 +95,15 @@ int main(int argc, char* argv[]) {
         goto cleanup;
     }
 
-    if (fwrite(loader_data, 1, loader_size, output_fp) != loader_size) {
-        fprintf(stderr, "Error: Cannot write loader data to output file\n");
+    size_t loader_written = fwrite(loader_data, 1, loader_size, output_fp);
+    if (loader_written != loader_size) {
+        fprintf(stderr, "Error: Cannot write loader data to output file (wrote %zu of %zu bytes)\n", loader_written, loader_size);
         goto cleanup;
     }
 
-    if (fwrite(packed_data, 1, packed_size, output_fp) != packed_size) {
-        fprintf(stderr, "Error: Cannot write packed data to output file\n");
+    size_t packed_written = fwrite(packed_data, 1, packed_size, output_fp);
+    if (packed_written != packed_size) {
+        fprintf(stderr, "Error: Cannot write packed data to output file (wrote %zu of %zu bytes)\n", packed_written, packed_size);
         goto cleanup;
     }
 

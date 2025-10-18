@@ -13,6 +13,10 @@ CFLAGS := -Wall -Wextra -O2 -std=c99
 TARGET_CFLAGS := -Wall -Wextra -O2 -std=c99 -static
 LDFLAGS := -static
 
+# OpenSSL flags - prefer shared libraries to avoid static linking warnings
+OPENSSL_CFLAGS := $(shell pkg-config --cflags openssl 2>/dev/null || echo "")
+OPENSSL_LDFLAGS := $(shell pkg-config --libs openssl 2>/dev/null || echo "-lssl -lcrypto")
+
 # Security flags
 SECURITY_FLAGS := -fstack-protector-strong -D_FORTIFY_SOURCE=2 -fPIE
 STEALTH_FLAGS := -fomit-frame-pointer -s -fno-asynchronous-unwind-tables -fno-stack-protector
@@ -30,8 +34,8 @@ LOADER_BIN := $(BUILD_DIR)/loader
 STUBGEN_BIN := $(BUILD_DIR)/stubgen
 
 # Enhanced source files (including obfuscation)
-PACKER_SOURCES := $(PACKER_DIR)/packer.c $(PACKER_DIR)/rc4.c $(PACKER_DIR)/obfuscation.c
-LOADER_SOURCES := $(LOADER_DIR)/loader.c $(LOADER_DIR)/memexec.c $(PACKER_DIR)/elf64.c $(PACKER_DIR)/rc4.c $(PACKER_DIR)/obfuscation.c
+PACKER_SOURCES := $(PACKER_DIR)/packer.c $(PACKER_DIR)/crypto.c $(PACKER_DIR)/obfuscation.c
+LOADER_SOURCES := $(LOADER_DIR)/loader.c $(LOADER_DIR)/memexec.c $(PACKER_DIR)/elf64.c $(PACKER_DIR)/crypto.c $(PACKER_DIR)/obfuscation.c
 STUBGEN_SOURCES := $(STUBGEN_DIR)/stubgen.c
 
 # Include paths
@@ -44,13 +48,13 @@ all: $(BUILD_DIR) $(PACKER_BIN) $(LOADER_BIN) $(STUBGEN_BIN)
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
-# Build packer 
+# Build packer
 $(PACKER_BIN): $(PACKER_SOURCES)
-	$(CC) $(CFLAGS) $(SECURITY_FLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS)
+	$(CC) $(CFLAGS) $(SECURITY_FLAGS) $(OPENSSL_CFLAGS) $(INCLUDES) -o $@ $^ $(OPENSSL_LDFLAGS)
 
 # Build loader
 $(LOADER_BIN): $(LOADER_SOURCES)
-	$(TARGET_CC) $(TARGET_CFLAGS) $(STEALTH_FLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS)
+	$(TARGET_CC) $(TARGET_CFLAGS) $(STEALTH_FLAGS) $(OPENSSL_CFLAGS) $(INCLUDES) -o $@ $^ $(OPENSSL_LDFLAGS) 2>/dev/null || $(TARGET_CC) $(TARGET_CFLAGS) $(STEALTH_FLAGS) $(OPENSSL_CFLAGS) $(INCLUDES) -o $@ $^ $(OPENSSL_LDFLAGS)
 
 # Build stub generator 
 $(STUBGEN_BIN): $(STUBGEN_SOURCES)
@@ -74,14 +78,14 @@ clean:
 
 # Install dependencies
 install-deps:
-	@echo "Installing ARM64 cross-compilation dependencies..."
+	@echo "Installing ARM64 cross-compilation and OpenSSL dependencies..."
 	@if command -v apt-get >/dev/null 2>&1; then \
 		sudo apt-get update && \
-		sudo apt-get install -y gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu; \
+		sudo apt-get install -y gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu libssl-dev; \
 	elif command -v yum >/dev/null 2>&1; then \
-		sudo yum install -y gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu; \
+		sudo yum install -y gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu openssl-devel; \
 	elif command -v pacman >/dev/null 2>&1; then \
-		sudo pacman -S aarch64-linux-gnu-gcc aarch64-linux-gnu-binutils; \
+		sudo pacman -S aarch64-linux-gnu-gcc aarch64-linux-gnu-binutils openssl; \
 	else \
-		echo "Please install ARM64 cross-compilation tools manually"; \
+		echo "Please install ARM64 cross-compilation and OpenSSL tools manually"; \
 	fi

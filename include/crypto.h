@@ -1,6 +1,6 @@
 
-#ifndef RC4_H
-#define RC4_H
+#ifndef CRYPTO_H
+#define CRYPTO_H
 
 #include <stdio.h>
 #include <stdint.h>
@@ -26,4 +26,4 @@ void chacha20_decrypt(uint8_t* data, size_t len, const uint8_t* key, const uint8
 // Utility functions
 void secure_random_bytes(uint8_t* buffer, size_t size);
 
-#endif 
+#endif

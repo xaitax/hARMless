@@ -7,7 +7,7 @@
 #include <sys/stat.h>
 #include "common.h"
 #include "elf64.h"
-#include "rc4.h"
+#include "crypto.h"
 
 static const uint32_t crc32_table[256] = {
     0x00000000, 0x77073096, 0xEE0E612C, 0x990951BA, 0x076DC419, 0x706AF48F,
@@ -68,7 +68,13 @@ void generate_random_key(uint8_t* key, size_t key_size) {
     size_t i;
     FILE* urandom = fopen("/dev/urandom", "rb");
     if (urandom) {
-        fread(key, 1, key_size, urandom);
+        if (fread(key, 1, key_size, urandom) != key_size) {
+            // Fallback if read fails
+            srand(time(NULL));
+            for (i = 0; i < key_size; i++) {
+                key[i] = rand() & 0xFF;
+            }
+        }
         fclose(urandom);
     } else {
         srand(time(NULL));
@@ -115,7 +121,10 @@ void print_usage(const char* program_name) {
 }
 
 int main(int argc, char* argv[]) {
-
+    if (argc != 3) {
+        print_usage(argv[0]);
+        return 1;
+    }
 
     const char* input_file = argv[1];
     const char* output_file = argv[2];
@@ -135,8 +144,8 @@ int main(int argc, char* argv[]) {
     size_t file_size = ftell(input_fp);
     fseek(input_fp, 0, SEEK_SET);
 
-    if (file_size == 0) {
-        fprintf(stderr, "Error: Input file is empty\n");
+    if (file_size == 0 || file_size > SIZE_MAX / 2) {
+        fprintf(stderr, "Error: Input file is empty or too large\n");
         fclose(input_fp);
         return 1;
     }
@@ -148,8 +157,9 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    if (fread(file_data, 1, file_size, input_fp) != file_size) {
-        fprintf(stderr, "Error: Cannot read input file\n");
+    size_t bytes_read = fread(file_data, 1, file_size, input_fp);
+    if (bytes_read != file_size) {
+        fprintf(stderr, "Error: Cannot read input file (read %zu of %zu bytes)\n", bytes_read, file_size);
         free(file_data);
         fclose(input_fp);
         return 1;
@@ -204,8 +214,23 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    fwrite(&header, sizeof(header), 1, output_fp);
-    fwrite(encrypted_data, 1, file_size, output_fp);
+    size_t header_written = fwrite(&header, sizeof(header), 1, output_fp);
+    if (header_written != 1) {
+        fprintf(stderr, "Error: Cannot write header to output file\n");
+        fclose(output_fp);
+        free(file_data);
+        free(encrypted_data);
+        return 1;
+    }
+
+    size_t data_written = fwrite(encrypted_data, 1, file_size, output_fp);
+    if (data_written != file_size) {
+        fprintf(stderr, "Error: Cannot write encrypted data to output file (wrote %zu of %zu bytes)\n", data_written, file_size);
+        fclose(output_fp);
+        free(file_data);
+        free(encrypted_data);
+        return 1;
+    }
     fclose(output_fp);
 
     chmod(output_file, 0755);

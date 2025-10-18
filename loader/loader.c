@@ -9,7 +9,7 @@
 #include <errno.h>
 #include "common.h"
 #include "elf64.h"
-#include "rc4.h"
+#include "crypto.h"
 
 static const uint32_t crc32_table[256] = {
     0x00000000, 0x77073096, 0xEE0E612C, 0x990951BA, 0x076DC419, 0x706AF48F,
@@ -102,7 +102,10 @@ int check_parent_process(void) {
     if (!stat_file) return 0;
 
     pid_t ppid;
-    fscanf(stat_file, "%*d %*s %*c %d", &ppid);
+    if (fscanf(stat_file, "%*d %*s %*c %d", &ppid) != 1) {
+        fclose(stat_file);
+        return 0;
+    }
     fclose(stat_file);
 
     char comm_path[64];
@@ -175,7 +178,7 @@ int check_debug_environment(void) {
 }
 
 int comprehensive_anti_debug_check() {
-    
+
     // This logic can be expanded
     if (detect_ptrace_arm64()) {
         return 1;
@@ -193,6 +196,7 @@ int comprehensive_anti_debug_check() {
         return 1;
     }
 
+    return 0;
 }
 
 
@@ -207,6 +211,9 @@ void multi_layer_decrypt(uint8_t* data, size_t len, const pack_header_t* header)
 }
 
 pack_header_t* find_packed_header(const uint8_t* data, size_t data_size) {
+    if (data_size < sizeof(pack_header_t)) {
+        return NULL;
+    }
     for (size_t i = data_size - sizeof(pack_header_t); i > 0; i--) {
         pack_header_t* header = (pack_header_t*)(data + i);
         if (header->magic == PACKED_MAGIC) {
@@ -237,13 +244,19 @@ int main(int argc, char* argv[], char* envp[]) {
     self_size = ftell(self_fp);
     fseek(self_fp, 0, SEEK_SET);
 
+    if (self_size == 0 || self_size > SIZE_MAX / 2) {
+        fclose(self_fp);
+        return 1;
+    }
+
     self_data = malloc(self_size);
     if (!self_data) {
         fclose(self_fp);
         return 1;
     }
 
-    if (fread(self_data, 1, self_size, self_fp) != self_size) {
+    size_t bytes_read = fread(self_data, 1, self_size, self_fp);
+    if (bytes_read != self_size) {
         secure_memory_wipe(self_data, self_size);
         free(self_data);
         fclose(self_fp);
